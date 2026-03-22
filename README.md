@@ -16,9 +16,11 @@ streamlit run streamlit_app.py
 The Streamlit app:
 - reads `DATABASE_URL` and `OPENAI_API_KEY` from `.env`
 - accepts each question in the browser instead of from `QUERY_TEXT`
-- queries the existing `website_docs` vector collection
+- retains conversation history for follow-up questions within the browser session
+- queries the existing `website_docs` vector collection through a LlamaIndex chat engine
 - prefers structured event results when the question is about library events
 - shows the answer and the retrieved source snippets
+- lets you reset the conversation from the sidebar
 
 Expected flow:
 1. `python src/crawl.py`
@@ -83,20 +85,26 @@ During indexing, each markdown file can be paired with a same-basename event sid
 
 ## Querying
 
-Query the existing Supabase-backed index with LlamaIndex from the command line:
+Chat with the existing Supabase-backed index from the command line:
 
 ```bash
 # After indexing
-# Configure .env with DATABASE_URL, OPENAI_API_KEY, and QUERY_TEXT
+# Configure .env with DATABASE_URL and OPENAI_API_KEY
 python src/query.py
+```
+
+Optional first-turn bootstrap:
+
+```bash
+QUERY_TEXT="when is the library open on sundays" python src/query.py
 ```
 
 Environment variables:
 - `DATABASE_URL` - PostgreSQL connection string for Supabase (required)
 - `OPENAI_API_KEY` - Used for retrieval and response generation (required)
-- `QUERY_TEXT` - Optional non-UI fallback question for the CLI script
+- `QUERY_TEXT` - Optional first-turn bootstrap for the interactive CLI chat
 
-The CLI script is useful for quick debugging, but the primary question-answering workflow is the Streamlit UI. The current app uses a chat-style interface over single-turn retrieval and does not yet implement conversational memory or streaming.
+The CLI script now starts an interactive chat loop. The Streamlit app and the CLI both retain conversation history for follow-up questions, but they do not yet implement token streaming.
 
 Event-aware querying behavior:
 - questions about events prefer retrieved nodes with structured event metadata
@@ -121,7 +129,7 @@ Planned guardrailed runtime flow:
 5. Generate an answer with the existing OpenAI-backed query model.
 6. Apply output guardrails to the final answer before returning it to the user.
 
-The current runtime applies the guardrailed flow in both the CLI and Streamlit UI.
+The current runtime applies the guardrailed flow in both the CLI and Streamlit UI while retaining only successful user/assistant turns in chat history.
 
 ## Tests
 

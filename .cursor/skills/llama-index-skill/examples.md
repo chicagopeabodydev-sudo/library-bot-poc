@@ -150,3 +150,15 @@ response = llm.predict_and_call(
 ```
 
 ---
+
+## Example 4 - Chat Engine to retain coversation history
+
+```python
+chat_engine = index.as_chat_engine()
+streaming_response = chat_engine.stream_chat("Tell me a joke.")
+for token in streaming_response.response_gen:
+    print(token, end="")
+
+```
+
+---

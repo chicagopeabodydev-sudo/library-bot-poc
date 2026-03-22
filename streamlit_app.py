@@ -13,7 +13,7 @@ except ImportError:
         return False
 
 from src.guardrails import run_guardrailed_query
-from src.query import build_query_engine
+from src.query import build_chat_engine, reset_chat_history
 from src.rag import COLLECTION_NAME, get_required_env
 
 APP_TITLE = "Library Bot"
@@ -51,11 +51,22 @@ def render_sources(sources: list[dict[str, Any]]) -> None:
             st.write(excerpt or "No excerpt available.")
 
 
-@st.cache_resource(show_spinner=False)
-def get_cached_query_pipeline() -> Any:
-    """Build the shared retrieval/synthesis pipeline once per session."""
-    database_url = get_required_env("DATABASE_URL")
-    return build_query_engine(database_url=database_url)
+def _initial_messages() -> list[dict[str, Any]]:
+    return [
+        {
+            "role": "assistant",
+            "content": "Ask a question about the indexed library content.",
+            "sources": [],
+        }
+    ]
+
+
+def get_session_query_pipeline() -> Any:
+    """Build one shared chat pipeline per browser session."""
+    if "query_pipeline" not in st.session_state:
+        database_url = get_required_env("DATABASE_URL")
+        st.session_state.query_pipeline = build_chat_engine(database_url=database_url)
+    return st.session_state.query_pipeline
 
 
 def main() -> None:
@@ -68,10 +79,15 @@ def main() -> None:
     with st.sidebar:
         st.write(f"Collection: `{COLLECTION_NAME}`")
         st.write("Configuration is read from `.env`.")
-        st.write("Use `QUERY_TEXT` only as the CLI fallback for `python src/query.py`.")
+        st.write("The CLI now starts an interactive chat with optional `QUERY_TEXT` bootstrap.")
+        if st.button("Reset conversation", use_container_width=True):
+            if "query_pipeline" in st.session_state:
+                reset_chat_history(st.session_state.query_pipeline)
+            st.session_state.messages = _initial_messages()
+            st.rerun()
 
     try:
-        query_pipeline = get_cached_query_pipeline()
+        query_pipeline = get_session_query_pipeline()
     except ValueError as exc:
         st.error(str(exc))
         st.stop()
@@ -80,13 +96,7 @@ def main() -> None:
         st.stop()
 
     if "messages" not in st.session_state:
-        st.session_state.messages = [
-            {
-                "role": "assistant",
-                "content": "Ask a question about the indexed library content.",
-                "sources": [],
-            }
-        ]
+        st.session_state.messages = _initial_messages()
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):

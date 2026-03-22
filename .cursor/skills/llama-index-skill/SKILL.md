@@ -92,6 +92,10 @@ retriever = VectorIndexRetriever(
 | **accumulate** | Applies the query to **each Node independently**, accumulating all responses into an array and returning them as a concatenated result. | Helpful when each chunk should be processed individually rather than merged into a single synthesized answer. |
 
 
+## Query Engine compared to Chat Engine
+Chat engine is a high-level interface for having a conversation with your data (multiple back-and-forth instead of a single question & answer). Chat engine is a stateful analogy of a Query Engine. By keeping track of the conversation history, it can answer questions with past context in mind.
+
+
 ## Additional Resources
 - For usage examples, see [examples.md](examples.md)
 - [LlamaIndex documentation](https://docs.llamaindex.ai/)
@@ -99,3 +103,4 @@ retriever = VectorIndexRetriever(
 - Indexing documentation [Indexing-Documents](https://developers.llamaindex.ai/python/framework/understanding/rag/indexing/)
 - Storing embedding results documentation [Storing-Indexed-Data](https://developers.llamaindex.ai/python/framework/understanding/rag/storing/)
 - Querying LLMs [Querying](https://developers.llamaindex.ai/python/framework/understanding/rag/querying/)
+- Chat Engine [Chat-engine](https://developers.llamaindex.ai/python/framework/module_guides/deploying/chat_engines/)

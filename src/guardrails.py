@@ -26,7 +26,6 @@ sys.path = [path for path in sys.path if path != str(_project_root)]
 sys.path.insert(0, str(_project_root))
 
 from guardrails.actions import (
-    LIBRARY_TOPIC_HINTS,
     check_library_input,
     check_library_output,
 )
@@ -114,55 +113,15 @@ def apply_output_guardrails(
     return RailsResult(status=RailStatus.PASSED, content=answer_text)
 
 
-def _node_text(source_node: Any) -> str:
-    node = getattr(source_node, "node", source_node)
-    try:
-        return str(node.get_content()).strip()
-    except (AttributeError, TypeError):
-        return str(getattr(node, "text", "")).strip()
-
-
-def _node_metadata(source_node: Any) -> dict[str, Any]:
-    node = getattr(source_node, "node", source_node)
-    return dict(getattr(node, "metadata", {}) or {})
-
-
-def _node_has_library_signals(source_node: Any) -> bool:
-    text = _node_text(source_node).lower()
-    metadata = _node_metadata(source_node)
-    metadata_blob = " ".join(str(value).lower() for value in metadata.values())
-
-    if not text:
-        return False
-
-    for hint in LIBRARY_TOPIC_HINTS:
-        if hint in text or hint in metadata_blob:
-            return True
-
-    # If a retrieved node has normal source metadata and substantial text,
-    # keep it unless it is clearly empty or malformed.
-    return bool(text and (metadata.get("file_name") or metadata.get("source") or metadata.get("url")))
-
-
-def filter_retrieved_nodes(nodes: list[Any]) -> list[Any]:
-    """Remove empty or clearly off-topic retrieved nodes before synthesis."""
-    return [node for node in nodes if _node_has_library_signals(node)]
-
-
-def _extract_sources_from_nodes(nodes: list[Any]) -> list[dict[str, Any]]:
-    response_like = type("RetrievedNodesResponse", (), {"source_nodes": nodes})()
-    return query.extract_sources(response_like)
-
-
 def run_guardrailed_query(
     query_text: str,
     *,
-    query_pipeline: query.QueryPipeline | Any | None = None,
+    query_pipeline: query.ChatPipeline | Any | None = None,
     database_url: str | None = None,
     similarity_top_k: int = query.SIMILARITY_TOP_K,
     config_dir: str | None = None,
 ) -> GuardrailedQueryResult:
-    """Run the shared query flow with input, retrieval, and output guardrails."""
+    """Run the shared chat flow with input, retrieval, and output guardrails."""
     load_dotenv(override=True)
     normalized_query = query.normalize_query_text(query_text)
 
@@ -183,19 +142,19 @@ def run_guardrailed_query(
     else:
         approved_question = normalized_query
 
-    pipeline = query_pipeline or query.build_query_engine(
+    pipeline = query_pipeline or query.build_chat_engine(
         database_url=database_url,
         similarity_top_k=similarity_top_k,
     )
 
-    retrieved_nodes = query.retrieve_nodes(
+    response = query.run_chat_turn(
         approved_question,
-        retriever=pipeline.retriever if hasattr(pipeline, "retriever") else None,
-        database_url=None if hasattr(pipeline, "retriever") else database_url,
+        query_pipeline=pipeline,
+        database_url=database_url,
         similarity_top_k=similarity_top_k,
+        commit_history=False,
     )
-    approved_nodes = filter_retrieved_nodes(retrieved_nodes)
-    approved_nodes = query.select_nodes_for_query(approved_question, approved_nodes)
+    approved_nodes = list(getattr(response, "source_nodes", []) or [])
 
     if not approved_nodes:
         return GuardrailedQueryResult(
@@ -207,11 +166,6 @@ def run_guardrailed_query(
             sources=[],
         )
 
-    response = query.synthesize_response(
-        approved_question,
-        approved_nodes,
-        response_synthesizer=pipeline.response_synthesizer if hasattr(pipeline, "response_synthesizer") else None,
-    )
     answer_text = str(response)
 
     if _is_guardrails_enabled():
@@ -234,11 +188,14 @@ def run_guardrailed_query(
     else:
         final_answer = answer_text
 
+    if isinstance(pipeline, query.ChatPipeline):
+        query.append_chat_turn(pipeline, approved_question, str(final_answer))
+
     return GuardrailedQueryResult(
         approved_question=approved_question,
         answer_text=final_answer,
         blocked=False,
         block_stage=None,
         source_nodes=approved_nodes,
-        sources=_extract_sources_from_nodes(approved_nodes),
+        sources=query.extract_sources(response),
     )
