@@ -142,7 +142,7 @@ Run tests from the project root:
 ```
 
 Useful focused test runs:
-- `"/Users/peabody/Documents/repos/library_bot_poc/library_bot_poc/.venv/bin/pytest" tests/test_query.py tests/test_guardrails.py -v`
-- `"/Users/peabody/Documents/repos/library_bot_poc/library_bot_poc/.venv/bin/pytest" tests/test_crawl.py tests/test_index.py -v`
+- `"/Users/peabody/Documents/repos/library_bot_poc/library_bot_poc/.venv/bin/pytest" tests/unit/test_query.py tests/unit/test_guardrails.py -v`
+- `"/Users/peabody/Documents/repos/library_bot_poc/library_bot_poc/.venv/bin/pytest" tests/integration/test_integration_crawl.py tests/unit/test_index.py -v`
 
-The crawl integration test (`tests/integration/test_crawl.py`) performs real HTTP requests and requires `.env` with `CRAWL_URL` configured. If `.env` is missing or `CRAWL_URL` is not set, the test is skipped with a warning.
+The crawl integration test (`tests/integration/test_integration_crawl.py`) performs real HTTP requests and requires `.env` with `CRAWL_URL` configured. If `.env` is missing or `CRAWL_URL` is not set, the test is skipped with a warning.

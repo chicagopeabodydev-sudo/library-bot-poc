@@ -16,8 +16,8 @@ from src.guardrails import run_guardrailed_query
 from src.query import build_chat_engine, reset_chat_history
 from src.rag import COLLECTION_NAME, get_required_env
 
-APP_TITLE = "Library Bot"
-APP_CAPTION = "Ask questions about the indexed website content."
+APP_TITLE = "Library Information Desk"
+APP_CAPTION = "What would you like to know about our wonderful library?"
 SOURCE_EXPANDER_LABEL = "Retrieved sources"
 
 st.set_page_config(page_title=APP_TITLE)
