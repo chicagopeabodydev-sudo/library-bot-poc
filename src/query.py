@@ -71,6 +71,8 @@ LIBRARY_TOPIC_HINTS = (
     "library",
     "books",
     "book",
+    "open",
+    "closed",
     "hours",
     "catalog",
     "events",
@@ -79,7 +81,16 @@ LIBRARY_TOPIC_HINTS = (
     "storytime",
     "meeting room",
     "borrow",
+    "renew",
+    "return",
+    "fine",
+    "fees",
     "card",
+    "room",
+    "study",
+    "computer",
+    "printing",
+    "wifi",
     "wilmette",
 )
 
@@ -158,6 +169,12 @@ def analyze_query_intent(query_text: str) -> QueryIntent:
         is_event_query=is_event_query,
         target_age_group=target_age_group,
     )
+
+
+def has_library_topic_hints(query_text: str) -> bool:
+    """Return True when a question explicitly references likely library topics."""
+    normalized_query = normalize_query_text(query_text).lower()
+    return any(term in normalized_query for term in LIBRARY_TOPIC_HINTS)
 
 
 def _metadata_tokens(metadata: dict[str, Any], key: str) -> set[str]:

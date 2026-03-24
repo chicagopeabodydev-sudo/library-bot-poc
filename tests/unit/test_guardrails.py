@@ -66,6 +66,22 @@ async def test_check_library_input_allows_simple_library_questions() -> None:
     assert kids_events_allowed is True
 
 
+@pytest.mark.asyncio
+async def test_check_library_input_allows_contextual_follow_up() -> None:
+    """Short referential follow-ups should be allowed for prior library context."""
+    is_allowed = await check_library_input({"last_user_message": "what about Sundays?"})
+
+    assert is_allowed is True
+
+
+@pytest.mark.asyncio
+async def test_check_library_input_blocks_off_topic_question() -> None:
+    """Clearly off-topic questions should be rejected before chat."""
+    is_allowed = await check_library_input({"last_user_message": "what is quantum physics?"})
+
+    assert is_allowed is False
+
+
 def test_load_guardrails_app_supports_colang_2_custom_flows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -222,6 +238,112 @@ def test_guardrailed_query_blocks_input_before_chat(monkeypatch: pytest.MonkeyPa
     assert result.answer_text == guardrails.DEFAULT_BLOCKED_INPUT_MESSAGE
     assert chat_calls == []
     assert committed_turns == []
+
+
+def test_guardrailed_query_blocks_ambiguous_follow_up_before_history_condense(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """If the raw follow-up cannot retrieve library context, skip history-based answering."""
+    chat_calls: list[str] = []
+    pipeline = guardrails.query.ChatPipeline(query_engine="query-engine")
+    guardrails.query.append_chat_turn(
+        pipeline,
+        "What are the library hours?",
+        "The library is open until 6 PM on weekdays.",
+    )
+
+    monkeypatch.setattr(
+        guardrails,
+        "apply_input_guardrails",
+        lambda question, *, config_dir=None: RailsResult(
+            status=RailStatus.PASSED,
+            content=question,
+        ),
+    )
+    monkeypatch.setattr(guardrails.query, "retrieve_nodes", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        guardrails.query,
+        "run_chat_turn",
+        lambda query_text, **kwargs: chat_calls.append(query_text)
+        or FakeChatResponse(
+            text="The library is open until 6 PM on weekdays.",
+            source_nodes=[],
+        ),
+    )
+
+    result = guardrails.run_guardrailed_query(
+        "What about quantum physics?",
+        query_pipeline=pipeline,
+    )
+
+    assert result.blocked is True
+    assert result.block_stage == "input"
+    assert result.answer_text == guardrails.DEFAULT_BLOCKED_INPUT_MESSAGE
+    assert chat_calls == []
+
+
+def test_guardrailed_query_allows_contextual_follow_up_when_preview_finds_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Legitimate follow-ups should still use chat history when raw retrieval has support."""
+    approved_nodes = [
+        FakeNodeWithScore(
+            text="Sunday hours are 12 PM to 5 PM.",
+            metadata={"file_name": "hours.md"},
+        )
+    ]
+    chat_queries: list[str] = []
+    committed_turns: list[tuple[str, str]] = []
+    pipeline = guardrails.query.ChatPipeline(query_engine="query-engine")
+    guardrails.query.append_chat_turn(
+        pipeline,
+        "What are the library hours?",
+        "The library is open until 6 PM on weekdays.",
+    )
+
+    monkeypatch.setattr(
+        guardrails,
+        "apply_input_guardrails",
+        lambda question, *, config_dir=None: RailsResult(
+            status=RailStatus.PASSED,
+            content=question,
+        ),
+    )
+    monkeypatch.setattr(guardrails.query, "retrieve_nodes", lambda *args, **kwargs: approved_nodes)
+    monkeypatch.setattr(
+        guardrails.query,
+        "run_chat_turn",
+        lambda query_text, **kwargs: chat_queries.append(query_text)
+        or FakeChatResponse(
+            text="It is open 12 PM to 5 PM on Sundays.",
+            source_nodes=approved_nodes,
+        ),
+    )
+    monkeypatch.setattr(
+        guardrails,
+        "apply_output_guardrails",
+        lambda question, answer_text, *, config_dir=None: RailsResult(
+            status=RailStatus.PASSED,
+            content=answer_text,
+        ),
+    )
+    monkeypatch.setattr(
+        guardrails.query,
+        "append_chat_turn",
+        lambda active_pipeline, user_message, assistant_message: committed_turns.append(
+            (user_message, assistant_message)
+        ),
+    )
+
+    result = guardrails.run_guardrailed_query(
+        "What about Sundays?",
+        query_pipeline=pipeline,
+    )
+
+    assert result.blocked is False
+    assert result.answer_text == "It is open 12 PM to 5 PM on Sundays."
+    assert chat_queries == ["What about Sundays?"]
+    assert committed_turns == [("What about Sundays?", "It is open 12 PM to 5 PM on Sundays.")]
 
 
 def test_guardrailed_query_returns_no_context_when_chat_response_has_no_sources(

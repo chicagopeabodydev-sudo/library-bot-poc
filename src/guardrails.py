@@ -32,7 +32,10 @@ from guardrails.actions import (
 from src import query
 
 DEFAULT_GUARDRAILS_DIR = "guardrails"
-DEFAULT_BLOCKED_INPUT_MESSAGE = "Sorry, I can only help with safe questions about the indexed library website."
+DEFAULT_BLOCKED_INPUT_MESSAGE = (
+    "Sorry, I didn't understand that. Please clarify your question or ask "
+    "something about the indexed library website."
+)
 DEFAULT_NO_APPROVED_CONTEXT_MESSAGE = "Sorry, I couldn't find approved source material to answer that safely."
 DEFAULT_BLOCKED_OUTPUT_MESSAGE = "Sorry, I can't provide that response."
 
@@ -71,6 +74,19 @@ def load_guardrails_app(config_dir: str | None = None) -> LLMRails:
 def _run_guardrail_action(coro: Any) -> Any:
     """Run an async custom guardrail action from the sync app entrypoints."""
     return asyncio.run(coro)
+
+
+def _build_blocked_input_result(*, rail_name: str | None = None) -> GuardrailedQueryResult:
+    """Return the shared clarification response for blocked or unclear input."""
+    return GuardrailedQueryResult(
+        approved_question=None,
+        answer_text=DEFAULT_BLOCKED_INPUT_MESSAGE,
+        blocked=True,
+        block_stage="input",
+        source_nodes=[],
+        sources=[],
+        rail_name=rail_name,
+    )
 
 
 def apply_input_guardrails(question: str, *, config_dir: str | None = None) -> RailsResult:
@@ -146,6 +162,20 @@ def run_guardrailed_query(
         database_url=database_url,
         similarity_top_k=similarity_top_k,
     )
+
+    if _is_guardrails_enabled() and not query.has_library_topic_hints(approved_question):
+        preview_retriever = None
+        if isinstance(pipeline, query.ChatPipeline):
+            preview_retriever = getattr(pipeline.query_engine, "retriever", None)
+
+        preview_nodes = query.retrieve_nodes(
+            approved_question,
+            retriever=preview_retriever,
+            database_url=database_url,
+            similarity_top_k=similarity_top_k,
+        )
+        if not preview_nodes:
+            return _build_blocked_input_result(rail_name="CheckLibraryTopicContext")
 
     response = query.run_chat_turn(
         approved_question,

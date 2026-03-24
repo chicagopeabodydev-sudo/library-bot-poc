@@ -33,12 +33,18 @@ OUTPUT_BLOCKED_TERMS = {
 
 LIBRARY_TOPIC_HINTS = {
     "library",
+    "open",
+    "closed",
     "hours",
     "branch",
     "catalog",
     "borrow",
     "borrowing",
     "checkout",
+    "renew",
+    "return",
+    "fine",
+    "fees",
     "book",
     "books",
     "event",
@@ -50,6 +56,35 @@ LIBRARY_TOPIC_HINTS = {
     "locations",
     "program",
     "services",
+    "room",
+    "study",
+    "computer",
+    "printing",
+    "wifi",
+    "museum",
+}
+FOLLOW_UP_PHRASES = (
+    "what about",
+    "how about",
+    "and what about",
+    "and how about",
+    "what about on",
+    "how about on",
+    "what about for",
+    "how about for",
+)
+FOLLOW_UP_REFERENCE_TERMS = {
+    "it",
+    "its",
+    "that",
+    "those",
+    "these",
+    "they",
+    "them",
+    "there",
+    "same",
+    "instead",
+    "also",
 }
 
 
@@ -74,9 +109,21 @@ def _read_context_text(context: dict[str, Any], keys: list[str]) -> str:
     return ""
 
 
+def _contains_library_topic_hint(user_text: str) -> bool:
+    return any(term in user_text for term in LIBRARY_TOPIC_HINTS)
+
+
+def _looks_like_contextual_follow_up(user_text: str) -> bool:
+    if any(user_text.startswith(phrase) for phrase in FOLLOW_UP_PHRASES):
+        return True
+
+    words = [word.strip(".,!?") for word in user_text.split()]
+    return len(words) <= 6 and any(word in FOLLOW_UP_REFERENCE_TERMS for word in words)
+
+
 @action(name="CheckLibraryInputAction", is_system_action=True)
 async def check_library_input(context: Optional[dict] = None) -> bool:
-    """Block empty questions and obvious prompt-injection attempts."""
+    """Allow library-topic questions while blocking unsafe or off-topic inputs."""
     context = context or {}
     user_text = _read_context_text(
         context,
@@ -86,7 +133,10 @@ async def check_library_input(context: Optional[dict] = None) -> bool:
     if not user_text:
         return False
 
-    return not any(term in user_text for term in INPUT_BLOCKED_TERMS)
+    if any(term in user_text for term in INPUT_BLOCKED_TERMS):
+        return False
+
+    return _contains_library_topic_hint(user_text) or _looks_like_contextual_follow_up(user_text)
 
 
 @action(name="CheckLibraryOutputAction", is_system_action=True)
