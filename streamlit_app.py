@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import streamlit as st
@@ -19,8 +20,25 @@ from src.rag import COLLECTION_NAME, get_required_env
 APP_TITLE = "Library Information Desk"
 APP_CAPTION = "What would you like to know about our wonderful library?"
 SOURCE_EXPANDER_LABEL = "Retrieved sources"
+ASSISTANT_IMAGE_PATH = (
+    Path(__file__).resolve().parent / "assets" / "images" / "S_Calvin_Information_Desk.png"
+)
 
 st.set_page_config(page_title=APP_TITLE)
+
+
+def apply_ui_styles() -> None:
+    """Hide the default assistant avatar icon."""
+    st.markdown(
+        """
+        <style>
+        [data-testid="stChatMessageAvatarAssistant"] {
+            display: none;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_sources(sources: list[dict[str, Any]]) -> None:
@@ -52,13 +70,7 @@ def render_sources(sources: list[dict[str, Any]]) -> None:
 
 
 def _initial_messages() -> list[dict[str, Any]]:
-    return [
-        {
-            "role": "assistant",
-            "content": "Ask a question about the indexed library content.",
-            "sources": [],
-        }
-    ]
+    return []
 
 
 def get_session_query_pipeline() -> Any:
@@ -69,12 +81,79 @@ def get_session_query_pipeline() -> Any:
     return st.session_state.query_pipeline
 
 
+def render_assistant_image() -> None:
+    """Render the assistant image centered in the left column."""
+    if not ASSISTANT_IMAGE_PATH.exists():
+        st.info("Assistant image not found.")
+        return
+
+    st.image(str(ASSISTANT_IMAGE_PATH), use_container_width=True)
+
+
+def build_chat_turns(messages: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
+    """Group chat history into question/answer turns."""
+    turns: list[list[dict[str, Any]]] = []
+    index = 0
+
+    while index < len(messages):
+        message = messages[index]
+        turn = [message]
+
+        if (
+            message.get("role") == "user"
+            and index + 1 < len(messages)
+            and messages[index + 1].get("role") == "assistant"
+        ):
+            turn.append(messages[index + 1])
+            index += 2
+        else:
+            index += 1
+
+        turns.append(turn)
+
+    return turns
+
+
+def render_chat_panel(query_pipeline: Any) -> None:
+    """Render the chat caption, history, and chat input."""
+    st.caption(APP_CAPTION)
+
+    if prompt := st.chat_input():
+        st.session_state.messages.append({"role": "user", "content": prompt, "sources": []})
+        try:
+            result = run_guardrailed_query(prompt, query_pipeline=query_pipeline)
+        except ValueError as exc:
+            st.session_state.messages.append(
+                {"role": "assistant", "content": str(exc), "sources": []}
+            )
+        except Exception:
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "content": "Sorry, the app couldn't answer that question right now.",
+                    "sources": [],
+                }
+            )
+        else:
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "content": result.answer_text,
+                    "sources": result.sources,
+                }
+            )
+
+    for turn in reversed(build_chat_turns(st.session_state.messages)):
+        for message in turn:
+            with st.chat_message(message["role"]):
+                st.write(message["content"])
+                render_sources(message.get("sources", []))
+
+
 def main() -> None:
     """Render the Streamlit RAG chat UI."""
     load_dotenv(override=True)
-
-    st.title(APP_TITLE)
-    st.caption(APP_CAPTION)
+    apply_ui_styles()
 
     with st.sidebar:
         st.write(f"Collection: `{COLLECTION_NAME}`")
@@ -98,40 +177,11 @@ def main() -> None:
     if "messages" not in st.session_state:
         st.session_state.messages = _initial_messages()
 
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
-            render_sources(message.get("sources", []))
-
-    if prompt := st.chat_input("Ask about the indexed content"):
-        st.session_state.messages.append({"role": "user", "content": prompt, "sources": []})
-        with st.chat_message("user"):
-            st.write(prompt)
-
-        with st.chat_message("assistant"):
-            with st.spinner("Searching the library index..."):
-                try:
-                    result = run_guardrailed_query(prompt, query_pipeline=query_pipeline)
-                except ValueError as exc:
-                    st.error(str(exc))
-                    return
-                except Exception:
-                    st.error("Sorry, the app couldn't answer that question right now.")
-                    return
-
-            answer_text = result.answer_text
-            sources = result.sources
-
-            st.write(answer_text)
-            render_sources(sources)
-
-        st.session_state.messages.append(
-            {
-                "role": "assistant",
-                "content": answer_text,
-                "sources": sources,
-            }
-        )
+    image_column, chat_column = st.columns([2, 3], gap="large")
+    with image_column:
+        render_assistant_image()
+    with chat_column:
+        render_chat_panel(query_pipeline)
 
 
 if __name__ == "__main__":

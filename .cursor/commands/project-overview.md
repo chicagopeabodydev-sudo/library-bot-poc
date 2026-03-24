@@ -26,6 +26,11 @@ The chatbot steps are:
 
 ---
 
+## Streamlit UI
+The streamlit UI has two vertical columns. The column on the left displays an image that represents the chatbot. The column on the right displays the actual text of the user-inputted chats/questions as well as the RAG-supported responses.
+
+---
+
 ## Parsing "Event" Models
 Some of the content scraped from the local library website will describe events, such as a live book reading by an author or a game night for teenagers.
 
