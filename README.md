@@ -1,8 +1,15 @@
 # library_bot_poc
 
-A RAG system with a chatbot. Content is crawled from a website and indexed for retrieval.
+This is a POC chatbot that uses retrieval augmented generation (RAG). The RAG content is from a local library website.
 
-The runtime now applies NeMo Guardrails to the question-answering flow and can also extract structured library event data during crawling.
+Tech stack:
+1. Crawl4ai - used to crawl the library website from the home page (it automatically follows internal links) and generates markdown files from the crawled content
+2. LlamaIndex - used to index the markdown files (i.e. chunking and embedding)
+3. pgVector Collection on Supabase - stores the indexing results
+4. Streamlit - simple chatbot UI
+5. NeMo Guardrails - guards against malicious, inappropriate, or off-topic questions and also verifies LLM responses are appropriate
+6. Pydantic models - to standardize data about "events" at the library (used by crawl4ai)
+
 
 ## Streamlit UI
 
@@ -113,36 +120,46 @@ Event-aware querying behavior:
 
 ## Guardrails Configuration
 
-The repository is prepared for a NeMo Guardrails configuration that will live in `guardrails/` by default.
+The application currently uses NeMo Guardrails in both the CLI chat flow and the Streamlit UI. The guardrail configuration lives in `guardrails/` by default.
 
 Install dependencies from `requirements.txt`, which now includes `nemoguardrails[openai]` so NeMo Guardrails uses the existing OpenAI model setup for this project.
 
+### Configuration
+
 Environment variables:
+- `OPENAI_API_KEY` - Required by the configured NeMo Guardrails OpenAI-backed model
 - `GUARDRAILS_ENABLED` - Enables or disables guardrail integration once the runtime wiring is added. Suggested values are `1` or `0`.
 - `GUARDRAILS_CONFIG_DIR` - Directory that will contain the NeMo Guardrails config files. Default example value: `guardrails`
 
-Planned guardrailed runtime flow:
+### Runtime Behavior
+
+The current guardrailed runtime flow is:
 1. Accept the user question in Streamlit or from `QUERY_TEXT`.
 2. Apply input guardrails to the question.
-3. Retrieve candidate context from the existing Supabase-backed index.
-4. Apply retrieval guardrails to the retrieved RAG content.
+3. If the question is off-topic, unsafe, or not understandable, return a clarification-style message instead of sending it into the history-aware chat engine.
+4. Retrieve candidate context from the existing Supabase-backed index.
 5. Generate an answer with the existing OpenAI-backed query model.
 6. Apply output guardrails to the final answer before returning it to the user.
 
-The current runtime applies the guardrailed flow in both the CLI and Streamlit UI while retaining only successful user/assistant turns in chat history.
+Behavior notes:
+- only successful user/assistant turns are retained in chat history
+- blocked or unclear questions are not committed to history
+- short contextual follow-up questions are allowed when they appear related to the existing library conversation
+- if a question does not clearly reference library topics, the app performs a lightweight retrieval preview before allowing the history-aware chat flow to answer it
+- blocked input returns a clarification message asking the user to rephrase or stay on-topic
 
 ## Tests
 
 Run tests from the project root:
 
 ```bash
-"/Users/peabody/Documents/repos/library_bot_poc/library_bot_poc/.venv/bin/pytest" tests/ -v
+.venv/bin/pytest tests/ -v
 # or run only integration tests:
-"/Users/peabody/Documents/repos/library_bot_poc/library_bot_poc/.venv/bin/pytest" tests/integration/ -v
+.venv/bin/pytest tests/integration/ -v
 ```
 
 Useful focused test runs:
-- `"/Users/peabody/Documents/repos/library_bot_poc/library_bot_poc/.venv/bin/pytest" tests/unit/test_query.py tests/unit/test_guardrails.py -v`
-- `"/Users/peabody/Documents/repos/library_bot_poc/library_bot_poc/.venv/bin/pytest" tests/integration/test_integration_crawl.py tests/unit/test_index.py -v`
+- `.venv/bin/pytest tests/unit/test_query.py tests/unit/test_guardrails.py -v`
+- `.venv/bin/pytest tests/integration/test_integration_crawl.py tests/unit/test_index.py -v`
 
 The crawl integration test (`tests/integration/test_integration_crawl.py`) performs real HTTP requests and requires `.env` with `CRAWL_URL` configured. If `.env` is missing or `CRAWL_URL` is not set, the test is skipped with a warning.
