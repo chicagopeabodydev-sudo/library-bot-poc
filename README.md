@@ -3,12 +3,12 @@
 This is a POC chatbot that uses retrieval augmented generation (RAG). The RAG content is from a local library website.
 
 Tech stack:
-1. Crawl4ai - used to crawl the library website from the home page (it automatically follows internal links) and generates markdown files from the crawled content
-2. LlamaIndex - used to index the markdown files (i.e. chunking and embedding)
-3. pgVector Collection on Supabase - stores the indexing results
-4. Streamlit - simple chatbot UI
-5. NeMo Guardrails - guards against malicious, inappropriate, or off-topic questions and also verifies LLM responses are appropriate
-6. Pydantic models - to standardize data about "events" at the library (used by crawl4ai)
+1. **Crawl4ai**- used to crawl the library website from the home page (it automatically follows internal links) and generates markdown files from the crawled content
+2. **LlamaIndex** - used to index the markdown files (i.e. chunking and embedding)
+3. **pgVector Collection on Supabase** - stores the indexing results
+4. **Streamlit** - simple chatbot UI
+5. **NeMo Guardrails** - guards against malicious, inappropriate, or off-topic questions and also verifies LLM responses are appropriate
+6. **Pydantic Models** - to standardize data about "events" at the library (used by crawl4ai)
 
 
 ## Streamlit UI
@@ -119,7 +119,7 @@ Event-aware querying behavior:
 - if no structured event matches are available, the query flow falls back to normal retrieval results
 
 ## Guardrails Configuration
-
+### NOTE: plumbing for NeMo guardrails is in place but configs are NOT prod-level
 The application currently uses NeMo Guardrails in both the CLI chat flow and the Streamlit UI. The guardrail configuration lives in `guardrails/` by default.
 
 Install dependencies from `requirements.txt`, which now includes `nemoguardrails[openai]` so NeMo Guardrails uses the existing OpenAI model setup for this project.
