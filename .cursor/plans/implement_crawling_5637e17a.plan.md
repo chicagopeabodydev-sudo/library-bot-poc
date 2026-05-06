@@ -90,7 +90,7 @@ max_pages = int(os.environ.get("CRAWL_MAX_PAGES", 30))
 
 | File                | Purpose                                            |
 | ------------------- | -------------------------------------------------- |
-| `src/crawl.py`  | Entry point: load env, run crawler, write markdown |
+| `src/crawl.py`      | Entry point: load env, run crawler, write markdown |
 | `requirements.txt`  | `crawl4ai`, `python-dotenv`                        |
 | `.env.example`      | `CRAWL_URL`, `CRAWL_MAX_DEPTH`, `CRAWL_MAX_PAGES`  |
 | `website-markdown/` | Output directory for `.md` files                   |

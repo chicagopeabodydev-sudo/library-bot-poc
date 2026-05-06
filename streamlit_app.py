@@ -24,7 +24,7 @@ ASSISTANT_IMAGE_PATH = (
     Path(__file__).resolve().parent / "assets" / "images" / "S_Calvin_Information_Desk.png"
 )
 
-st.set_page_config(page_title=APP_TITLE)
+st.set_page_config(page_title=APP_TITLE, layout="wide")
 
 
 def apply_ui_styles() -> None:
@@ -177,7 +177,7 @@ def main() -> None:
     if "messages" not in st.session_state:
         st.session_state.messages = _initial_messages()
 
-    image_column, chat_column = st.columns([2, 3], gap="large")
+    image_column, chat_column = st.columns([3, 4], gap="medium")
     with image_column:
         render_assistant_image()
     with chat_column:

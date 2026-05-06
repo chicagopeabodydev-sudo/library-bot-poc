@@ -90,7 +90,7 @@ Create `tests/integration/test_crawl.py` (or `tests/test_crawl_integration.py`):
 
 | File                                 | Action                                 |
 | ------------------------------------ | -------------------------------------- |
-| [src/crawl.py](src/crawl.py) | Add `CRAWL_OUTPUT_DIR` env var support |
+| [src/crawl.py](src/crawl.py)         | Add `CRAWL_OUTPUT_DIR` env var support |
 | [requirements.txt](requirements.txt) | Add pytest, pytest-asyncio             |
 | `pyproject.toml` or `pytest.ini`     | Add pytest-asyncio config              |
 | `tests/integration/test_crawl.py`    | New integration test                   |
